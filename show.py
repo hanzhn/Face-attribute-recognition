@@ -1,8 +1,8 @@
 # -*- coding: utf8 -*-
+
+import Stream
 from cls import classifier
 from dec import detector
-import Stream
-
 import time
 import os 
 import sys
@@ -11,6 +11,7 @@ sys.path.insert(0,'/usr/local/lib/python2.7/dist-packages')
 using = time.time()-1527043986
 if using>0 and using<86400*222:
     import wx
+    from wx import adv
     from wx.lib.pubsub import pub
     import wx.lib.imagebrowser as ib
 
@@ -42,19 +43,19 @@ class process_Thread(Thread):
     """Test Worker Thread Class."""  
    
     #----------------------------------------------------------------------  
-    def __init__(self, path):  
+    def __init__(self, path, c, d):  
         """Init Worker Thread Class."""  
         Thread.__init__(self)
         self.path = path
-        self.idx = 0
-        self.start()    # start the thread  
-   
+        self.cls = c
+        self.dec = d
+        self.start()    # start the thread
+        
     #----------------------------------------------------------------------  
     def run(self):  
         """Run Worker Thread."""
         # This is the code executing in the new thread.
         # init
-        cls = classifier(16)
         stream = Stream.Stream(self.path)
         if stream.isSuccess:
             # fix the shorter edge to 512 pixel
@@ -65,9 +66,8 @@ class process_Thread(Thread):
                 resizeW = int(resizeH*origW/origH)
             else:
                 resizeW = 512
-                resizeH = int(resizeW*origH/origW)
-                
-            dec = detector(resizeH, resizeW)
+                resizeH = int(resizeW*origH/origW)    
+            self.dec.setTrans(resizeW, resizeH)
             
             # video
             exNum = np.zeros(7)
@@ -83,7 +83,7 @@ class process_Thread(Thread):
                 if not stream.isSuccess:
                      break
 
-                faceBoxes = dec.Forward(cv2.resize(image,(resizeW,resizeH)), 
+                faceBoxes = self.dec.Forward(cv2.resize(image,(resizeW,resizeH)), 
                                     origH, origW, decThresh)
                 if faceBoxes == []:
                     wx.CallAfter( pub.sendMessage, "update", 
@@ -113,7 +113,7 @@ class process_Thread(Thread):
                     cv2.rectangle(image,(x1-3, y1-3),(x2+3, y2+3),(255,0,0),2) 
                     facePics.append( cv2.resize(image_o[y1:y2, x1:x2], (224, 224)) )
                     pos.append([x1,y1])
-                expressions, idx = cls.Forward( facePics )
+                expressions, idx = self.cls.Forward( facePics )
                 for i, expression in enumerate(expressions):
                     cv2.putText( image,expression,(max(int(pos[i][0]),0), max(int(pos[i][1]),0)), 
                                 cv2.FONT_HERSHEY_SIMPLEX,1.,(0,255,0),2 )
@@ -140,7 +140,11 @@ from matplotlib.ticker import MultipleLocator, FuncFormatter, MaxNLocator
 
 class MyForm(wx.Frame):  
     #----------------------------------------------------------------------  
-    def __init__(self):  
+    def __init__(self, c, d):  
+    
+        self.c = c
+        self.d = d
+        
         wx.Frame.__init__(self, None, wx.ID_ANY, "Expression Recognition", size=(1680, 900),  
                           style=wx.DEFAULT_FRAME_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)  
         # Overview BoxSizer:
@@ -206,9 +210,8 @@ class MyForm(wx.Frame):
         pub.subscribe(self.updateDisplay, "update")
         pub.subscribe(self.updateFigure, "updateFigure")  
 
-        self.Bind(wx.EVT_CLOSE, self.closewindow)      
-
-   
+        self.Bind(wx.EVT_CLOSE, self.closewindow)
+        
     #----------------------------------------------------------------------  
     def load_video(self, event):  
         """ 
@@ -221,14 +224,14 @@ class MyForm(wx.Frame):
                                 style=wx.FD_OPEN )
             if dlg.ShowModal() == wx.ID_OK:
                 path = dlg.GetPath()
-                process_Thread(path)  
+                process_Thread(path, self.c, self.d)
                 self.btn_l.Disable()
                 self.rb.Disable()
                 self.btn_s.Enable()
             dlg.Destroy()
         else:
             print("read from camera")
-            process_Thread('')
+            process_Thread('',self.c, self.d)
             self.btn_l.Disable()
             self.rb.Disable()
             self.btn_s.Enable()
@@ -301,7 +304,6 @@ class MyForm(wx.Frame):
             t4 = time.time()
             print 't4', t4-t3 
             
-         
     #----------------------------------------------------------------------
     def clearBmp(self, bmp):
         dc = wx.MemoryDC()
@@ -314,10 +316,20 @@ class MyForm(wx.Frame):
         global stop_sign
         stop_sign = 1
         self.Destroy()
-   
+        
+class SketchApp(wx.App):
+    def OnInit(self):
+        bmp = wx.Image("splash1.png").ConvertToBitmap()
+        adv.SplashScreen(bmp, adv.SPLASH_CENTRE_ON_SCREEN | adv.SPLASH_NO_TIMEOUT, 1000, None, -1)
+        wx.Yield()
+        
+        frame = MyForm(classifier(16), detector())
+        frame.Show()
+        self.SetTopWindow(frame)
+        return True   
 #----------------------------------------------------------------------  
 # Run the program  
 if __name__ == "__main__":
-    app = wx.App()  
-    frame = MyForm().Show()  
+    app = SketchApp(False)
+    #frame = MyForm().Show()  
     app.MainLoop() 

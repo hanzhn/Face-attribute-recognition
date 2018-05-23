@@ -6,17 +6,17 @@ from time import time
 import caffe
 
 # caffe init
-net = caffe.Net('model/test_vgg.prototxt', 
-                'model/_iter_5000.caffemodel', caffe.TEST)
 expressions = ['happy', 'sad','feared', 'angry', 'disgusted', 'surprise', 'nothing']
 
 
 class classifier():
     def __init__(self, b):
         self.batchsize = b
+        
+        self.net = caffe.Net('model/test_vgg.prototxt', 'model/_iter_5000.caffemodel', caffe.TEST)
         # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
-        net.blobs['data'].reshape(b,3,224,224)      # set net to batch size of 1
-        self.transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
+        self.net.blobs['data'].reshape(b,3,224,224)      # set net to batch size of 1
+        self.transformer = caffe.io.Transformer({'data': self.net.blobs['data'].data.shape})
         self.transformer.set_transpose('data', (2,0,1))
         #transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
         self.transformer.set_mean('data',np.array((104.0, 117.0, 123.0), dtype=np.float32) ) # mean pixel
@@ -24,7 +24,6 @@ class classifier():
         
     # Network forward thread
     def Forward(self, images):
-        global net
         caffe.set_mode_gpu()
         t = time()
         
@@ -35,22 +34,22 @@ class classifier():
         results = np.zeros( (imgNum, len(expressions)) )
         
         if batchNum > 0:
-            net.blobs['data'].reshape(batchsize,3,224,224)
+            self.net.blobs['data'].reshape(batchsize,3,224,224)
         for i in range(batchNum):
             for j in range(batchsize):
-                net.blobs['data'].data[j,:,:] = self.transformer.preprocess('data',images[i*batchsize+j])
-            net.forward()
-            results[ i*batchsize : (i+1)*batchsize ] = net.blobs["prob"].data
+                self.net.blobs['data'].data[j,:,:] = self.transformer.preprocess('data',images[i*batchsize+j])
+            self.net.forward()
+            results[ i*batchsize : (i+1)*batchsize ] = self.net.blobs["prob"].data
             
         if residualNum > 0:
-            net.blobs['data'].reshape(residualNum,3,224,224)
+            self.net.blobs['data'].reshape(residualNum,3,224,224)
         for j in range(residualNum):
-            net.blobs['data'].data[j,:,:] = self.transformer.preprocess('data',images[batchNum*batchsize+j])
+            self.net.blobs['data'].data[j,:,:] = self.transformer.preprocess('data',images[batchNum*batchsize+j])
             if j+1 >= residualNum:
                 #print(net.blobs['data'].data[35],net.blobs['data'].data[34],net.blobs['data'].data[63])
-                net.forward()
+                self.net.forward()
                 #print(net.blobs["prob"].data[35],net.blobs["prob"].data[34],net.blobs['prob'].data[63])
-                results[ batchNum*batchsize : ] = net.blobs["prob"].data[:residualNum]
+                results[ batchNum*batchsize : ] = self.net.blobs["prob"].data[:residualNum]
         print 'Cls forward time:', time()-t
         idx = np.argmax(results, axis = 1)
         

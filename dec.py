@@ -26,14 +26,19 @@ def getLargest(faces):
         hs = faces[:,6] - faces[:,4]
         ss = ws * hs
         return faces[ss.argmax()]
-# caffe init
-net = caffe.Net('model/deploy.prototxt', 
-                'model/VGG_WIDER_FACE_ZYQ_iter_50000.caffemodel', caffe.TEST)      
+
+#----------------------------------------------------------------------------------- 
 class detector():
-    def __init__(self, h, w):
+    """detector"""
+    
+    def __init__(self):
+        # caffe init
+        self.net = caffe.Net('model/deploy.prototxt', 'model/VGG_WIDER_FACE_ZYQ_iter_50000.caffemodel', caffe.TEST)   
+        
+    def setTrans(self, w, h):
         # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
-        net.blobs['data'].reshape(1,3,h,w)      # set net to batch size of 1
-        self.transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
+        self.net.blobs['data'].reshape(1,3,h,w)      # set net to batch size of 1
+        self.transformer = caffe.io.Transformer({'data': self.net.blobs['data'].data.shape})
         self.transformer.set_transpose('data', (2,0,1))
         #transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
         #transformer.set_mean('data', np.load('out.npy').mean(1).mean(1)) # mean pixel
@@ -43,11 +48,10 @@ class detector():
     def Forward(self, img, w, h, thresh):
         caffe.set_mode_gpu()
         t = time()
-        print w, h
         #print self.transformer.preprocess('data',img).shape
-        net.blobs['data'].data[0,:,:] = self.transformer.preprocess('data',img)
-        net.forward()
-        data = net.blobs["detection_out"].data
+        self.net.blobs['data'].data[0,:,:] = self.transformer.preprocess('data',img)
+        self.net.forward()
+        data = self.net.blobs["detection_out"].data
         print 'Dec forward time:', time()-t
         
         flatten = data[0,0,:,:]
