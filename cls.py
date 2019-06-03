@@ -2,7 +2,6 @@
 import cv2
 import numpy as np
 
-import trans
 from time import time
 import caffe
 
@@ -17,7 +16,7 @@ class classifier():
         self.net = caffe.Net('model/test_vgg.prototxt', 'model/_iter_5000.caffemodel', caffe.TEST)
         # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
         self.net.blobs['data'].reshape(b,3,224,224)      # set net to batch size of 1
-        self.transformer = trans.Transformer({'data': self.net.blobs['data'].data.shape})
+        self.transformer = caffe.io.Transformer({'data': self.net.blobs['data'].data.shape})
         self.transformer.set_transpose('data', (2,0,1))
         #transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
         self.transformer.set_mean('data',np.array((104.0, 117.0, 123.0), dtype=np.float32) ) # mean pixel

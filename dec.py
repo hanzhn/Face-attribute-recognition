@@ -2,7 +2,6 @@
 import cv2
 import numpy as np
 
-import trans
 from time import time
 import caffe
 
@@ -34,12 +33,12 @@ class detector():
     
     def __init__(self):
         # caffe init
-        self.net = caffe.Net('model/deploy.prototxt', 'model/VGG_WIDER_FACE_ZYQ_iter_50000.caffemodel', caffe.TEST)   
+        self.net = caffe.Net('model/deploy.prototxt', 'model/VGG_WIDE_SFD_fpn_640_+76_iter_65000.caffemodel', caffe.TEST)   
         
     def setTrans(self, w, h):
         # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
         self.net.blobs['data'].reshape(1,3,h,w)      # set net to batch size of 1
-        self.transformer = trans.Transformer({'data': self.net.blobs['data'].data.shape})
+        self.transformer = caffe.io.Transformer({'data': self.net.blobs['data'].data.shape})
         self.transformer.set_transpose('data', (2,0,1))
         #transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
         #transformer.set_mean('data', np.load('out.npy').mean(1).mean(1)) # mean pixel
